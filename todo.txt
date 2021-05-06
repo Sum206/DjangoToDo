@@ -1,0 +1,214 @@
+#this file contains all the code written for to do list app
+#1 settings.py
+#adding the app name to the list of installed apps
+INSTALLED_APPS = [
+    'Todolist',
+]
+#adding path of the directory where all static files are located
+STATICFILES_DIRS=[
+    os.path.join(BASE_DIR, 'static')
+]
+#2 urls.py(of project)
+from django.contrib import admin
+from django.urls import path,include
+from Todolist import views
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('', include('Todolist.urls')),
+]
+
+#3 urls.py(of app)
+from django.urls import path
+from . import views
+urlpatterns = [
+path('', views.home, name="home"),
+path('delete/<list_id>', views.delete, name="delete"),
+path('mark/<list_id>', views.mark, name="mark"),
+path('unmark/<list_id>', views.unmark, name="unmark"),
+path('edit/<list_id>', views.edit, name="edit"),
+]
+
+#4 views.py
+from django.shortcuts import render, redirect
+from .models import list
+from .forms import listform
+from django.contrib import messages
+# Create your views here.
+def home(request):
+    if request.method=="POST":
+        form=listform(request.POST or None)
+        if form.is_valid():
+            form.save()
+            all_items= list.objects.all
+            messages.success(request, ('task added'))
+            return render(request, "home.html", {'all_items': all_items})
+    else:
+        all_items= list.objects.all
+        return render(request,"home.html", {'all_items': all_items})
+def delete(request, list_id):
+    task=list.objects.get(pk=list_id)
+    task.delete()
+    messages.success(request, ("task removed"))
+    return redirect('home')
+def mark(request, list_id):
+    task=list.objects.get(pk=list_id)
+    task.Completed=True
+    task.save()
+    return redirect('home')
+def unmark(request, list_id):
+    task=list.objects.get(pk=list_id)
+    task.Completed=False
+    task.save()
+    return redirect('home')
+def edit(request, list_id):
+    if request.method=="POST":
+        task=list.objects.get(pk=list_id)
+        form=listform(request.POST or None, instance=task)
+        if form.is_valid():
+            form.save()
+            messages.success(request, ('task edited'))
+            return redirect ('home')
+    else:
+        task=list.objects.get(pk=list_id)
+        return render(request,"edit.html", {'task': task})
+
+#5 models.py
+from django.db import models
+
+# Create your models here.
+class list(models.Model):
+    task=models.CharField(max_length=200)
+    Completed=models.BooleanField(default=False)
+    def __str__(self):
+        return self.task-'|'-str(self.Completed)
+
+#6 create a forms.py file
+from django import forms
+from .models import list
+class listform(forms.ModelForm):
+    class Meta:
+        model = list
+        fields = ["task", "Completed"]
+
+#templates
+#base.html
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- one can get the javascript and css bootstrap files either from CDN or saving them offline
+    and providing the links as I did below -->
+    <link rel="stylesheet" href="{% static 'css/bootstrap.css' %}">
+    <!-- the following stylesheet is to style the table -->
+    <link rel="stylesheet" href="{% static 'css/table.css' %}">
+    <title>Hello programmer</title>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="{% url 'home' %}">To Do List</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+              <li class="nav-item">
+            <form class="d-flex" method="POST">
+                {% csrf_token %}
+              <input class="form-control me-2" type="search" placeholder="Add here things to do" aria-label="Search" name="task">
+              <button class="btn btn-outline-secondary" type="submit" style="color: rgb(70, 152, 230);">Add task</button>
+            </form>
+          </div>
+        </div>
+      </nav>
+      <div class="container">
+    {% block content %}
+    {% endblock %}
+</div>
+    <link rel="stylesheet" href="{% static 'JavaScript/bootstrap.js' %}">
+  </body>
+</html>
+
+<!--home.html-->
+{% extends 'base.html' %}
+{% block content %}
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert: alert-warning alert-dismissable" role="alert">
+        <button class="close" data-dismiss= "alert">
+        <small><sup>To do list says</sup></small>    
+        </button>
+        {{message}}
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% if all_items %}
+    <table id="t01">
+        {% for things in all_items %}
+            {%if things.Completed%}
+                <tr class="table-secondary">
+                    <td><a href="{% url 'edit' things.id %} ">{{ things.task}}</a></td>
+                    <td><a href="{% url 'unmark' things.id %} ">UnMark</a></td>
+                    <td><a href="{% url 'delete' things.id %}">Delete</a></td>
+                </tr>
+            {%else %}   
+                <tr>
+                    <td><a href="{% url 'edit' things.id %} ">{{ things.task}}</a></td>
+                    <td><a href="{% url 'mark' things.id %} ">Mark as done</a></td>
+                    <td><a href="{% url 'delete' things.id %}">Delete</a></td>
+                    </tr>
+            {%endif%}
+        {% endfor %}
+    </table>
+    {%endif%}
+{% endblock %}
+
+<!--edit.html>
+{% extends 'base.html' %}
+{% block content %}
+    {% if task %}
+    <form style="color: rgb(26, 20, 61);" class="d-flex" method="POST">
+        {% csrf_token %}
+      <input class="form-control me-2" type="search" style="color: rgb(57, 60, 73);" placeholder="{{task.task}}" aria-label="Search" name="task">
+      <input type="hidden" value="{{task.Completed}}" name="Completed">
+      <button class="btn btn-outline-success" type="submit">edit task</button>
+    </form>
+    {% endif %}
+    {% endblock%}
+
+<!--the table.css stylesheet-->
+table, th, td {
+    border: 3px solid rgb(155, 136, 136);
+    border-spacing: 6px;
+  }
+  th, td {
+    padding: 25px;
+    text-align: center;
+  }
+  #t01 {
+    width: 100%;
+    background-color: #f1f1c1;
+  }
+  #t01 tr:nth-child(even) {
+    background-color: #104a64;
+  }
+  #t01 tr:nth-child(odd) {
+   background-color: #abb3ce;
+  }
+  a{
+    color: rgb(255, 255, 255);
+  }
+  a:link, a:visited {
+    background-color: #0b0e4b;
+    color: white;
+    padding: 5px 5px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+  }
+  a:hover, a:active {
+    background-color: rgb(250, 226, 8);
+  }
